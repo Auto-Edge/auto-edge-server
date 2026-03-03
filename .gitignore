@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Type checking
+.mypy_cache/
+.ruff_cache/
+
+# Distribution
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Data directory (created at runtime)
+shared_data/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# Environment
+.env
+.env.local
