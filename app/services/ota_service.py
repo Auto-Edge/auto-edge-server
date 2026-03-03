@@ -75,7 +75,7 @@ class OTAService:
         Check if an update is available for a model.
 
         Args:
-            model_id: Model ID to check.
+            model_id: Model ID or name to check.
             current_version: Current version on device (optional).
             device_id: Device ID for tracking (optional).
 
@@ -86,8 +86,18 @@ class OTAService:
         if device_id:
             await self._device_repo.update_last_seen(device_id)
 
+        # Resolve model_id (could be name or UUID)
+        resolved_model_id = await self._resolve_model_id(model_id)
+        if not resolved_model_id:
+            return UpdateCheckResponse(
+                has_update=False,
+                current_version=current_version,
+                latest_version=None,
+                download_url=None,
+            )
+
         # Get latest published version
-        latest = await self._model_repo.get_latest_published_version(model_id)
+        latest = await self._model_repo.get_latest_published_version(resolved_model_id)
 
         if not latest:
             return UpdateCheckResponse(
@@ -122,7 +132,7 @@ class OTAService:
         Get download information for a model version.
 
         Args:
-            model_id: Model ID.
+            model_id: Model ID or name.
             version: Version string (None for latest).
 
         Returns:
@@ -131,16 +141,24 @@ class OTAService:
         Raises:
             FileNotFoundError: If version or file not found.
         """
+        # Resolve model_id (could be name or UUID)
+        resolved_model_id = await self._resolve_model_id(model_id)
+        if not resolved_model_id:
+            raise AppFileNotFoundError(
+                message=f"Model '{model_id}' not found",
+                filename=model_id,
+            )
+
         # Get version
         if version is None or version.lower() == "latest":
-            model_version = await self._model_repo.get_latest_published_version(model_id)
+            model_version = await self._model_repo.get_latest_published_version(resolved_model_id)
             if not model_version:
                 raise AppFileNotFoundError(
                     message=f"No published version found for model '{model_id}'",
                     filename=model_id,
                 )
         else:
-            model_version = await self._model_repo.get_version_by_number(model_id, version)
+            model_version = await self._model_repo.get_version_by_number(resolved_model_id, version)
             if not model_version:
                 raise AppFileNotFoundError(
                     message=f"Version '{version}' not found for model '{model_id}'",
@@ -172,3 +190,25 @@ class OTAService:
     async def get_device_by_identifier(self, device_identifier: str) -> Optional[Device]:
         """Get device by its identifier."""
         return await self._device_repo.get_device_by_identifier(device_identifier)
+
+    async def _resolve_model_id(self, model_id_or_name: str) -> Optional[str]:
+        """
+        Resolve a model ID or name to the actual model UUID.
+
+        Args:
+            model_id_or_name: Either a UUID or model name.
+
+        Returns:
+            The model UUID if found, None otherwise.
+        """
+        # First try to get by ID (UUID)
+        model = await self._model_repo.get_model(model_id_or_name)
+        if model:
+            return model.id
+
+        # If not found, try to get by name
+        model = await self._model_repo.get_model_by_name(model_id_or_name)
+        if model:
+            return model.id
+
+        return None
